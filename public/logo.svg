@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="gfGradMain" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0c2d3e" />
+      <stop offset="35%" stop-color="#026d82" />
+      <stop offset="70%" stop-color="#00a89d" />
+      <stop offset="100%" stop-color="#00c8b3" />
+    </linearGradient>
+    <linearGradient id="gfGradWave" x1="0%" y1="80%" x2="100%" y2="20%">
+      <stop offset="0%" stop-color="#082b3a" />
+      <stop offset="50%" stop-color="#036980" />
+      <stop offset="100%" stop-color="#00a7b5" />
+    </linearGradient>
+    <linearGradient id="gfGradSpur" x1="20%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#00a2aa" />
+      <stop offset="100%" stop-color="#00c6be" />
+    </linearGradient>
+  </defs>
+
+  <!-- G Icon Group (Scale centered) -->
+  <g id="guestflow-icon" transform="translate(400, 150)">
+    <!-- Outer G Arc & Loop -->
+    <path d="M-10,-95 C55,-95 105,-45 105,20 C105,42 96,62 82,78 C74,68 65,60 52,56 C40,52 18,52 -5,68 C-25,82 -50,95 -75,80 C-98,64 -115,25 -105,-25 C-95,-72 -58,-95 -10,-95 Z" fill="url(#gfGradMain)" />
+    
+    <!-- Inner dynamic wave crest forming the G crossbar / flow -->
+    <path d="M-85,62 C-60,70 -30,55 -5,35 C15,18 42,12 70,12 C98,12 105,16 105,25 C105,48 85,82 45,95 C15,105 -35,102 -65,85 C-80,77 -84,70 -85,62 Z" fill="url(#gfGradWave)" />
+
+    <!-- Sharp modern inner spur / bar -->
+    <path d="M-8,14 C12,-8 48,-5 90,8 C102,12 106,18 106,35 C95,45 68,48 40,46 C12,44 -3,28 -8,14 Z" fill="url(#gfGradSpur)" />
+  </g>
+
+  <!-- Wordmark "GuestFlow" -->
+  <g id="guestflow-wordmark" transform="translate(400, 360)" text-anchor="middle">
+    <text font-family="'Outfit', 'Plus Jakarta Sans', system-ui, sans-serif" font-weight="800" font-size="78" letter-spacing="-1.5">
+      <tspan fill="#142936">Guest</tspan><tspan fill="#00adb5">Flow</tspan>
+    </text>
+    <!-- Tagline -->
+    <text y="42" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-weight="500" font-size="20" fill="#586e7a" letter-spacing="3.2">
+      GUEST EXPERIENCE &amp; HOTEL OPERATIONS PLATFORM
+    </text>
+  </g>
+</svg>

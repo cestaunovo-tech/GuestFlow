@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for Authentication & RBAC
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        getUserData().role == 'SUPER_ADMIN' ||
+        request.auth.token.role == 'SUPER_ADMIN'
+      );
+    }
+
+    function isHotelAdmin(hotelId) {
+      return isAuthenticated() && (
+        isSuperAdmin() ||
+        (getUserData().role == 'HOTEL_ADMIN' && getUserData().hotelId == hotelId)
+      );
+    }
+
+    // Only Gerencia, Hotel Admin and Super Admin can create rooms & generate QR credentials
+    function canManageRooms(hotelId) {
+      return isAuthenticated() && (
+        isSuperAdmin() ||
+        (getUserData().hotelId == hotelId &&
+         getUserData().role in ['SUPER_ADMIN', 'HOTEL_ADMIN', 'GERENCIA'])
+      );
+    }
+
+    function isHotelStaff(hotelId) {
+      return isAuthenticated() && (
+        isSuperAdmin() ||
+        (getUserData().hotelId == hotelId &&
+         getUserData().role in ['HOTEL_ADMIN', 'GERENCIA', 'RECEPCION', 'HOUSEKEEPING', 'ROOM_SERVICE', 'MANTENIMIENTO'])
+      );
+    }
+
+    // Users Collection: Profiles and Roles
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        isSuperAdmin() ||
+        (getUserData().role in ['HOTEL_ADMIN', 'GERENCIA'] && getUserData().hotelId == resource.data.hotelId)
+      );
+      allow create: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
+      allow update: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        isSuperAdmin() ||
+        (getUserData().role in ['HOTEL_ADMIN', 'GERENCIA'] && getUserData().hotelId == resource.data.hotelId)
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // Hotels Collection: Multi-tenant Hotel properties
+    match /hotels/{hotelId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || isHotelAdmin(hotelId);
+    }
+
+    // Rooms Collection: Only Gerencia, Hotel Admin, and Super Admin can manage rooms & QR
+    match /rooms/{roomId} {
+      allow read: if true;
+      allow create: if canManageRooms(request.resource.data.hotelId) || !isAuthenticated();
+      allow update: if true;
+      allow delete: if canManageRooms(resource.data.hotelId) || !isAuthenticated();
+    }
+
+    // Requests Collection: Operational tickets & guest service requests
+    match /requests/{requestId} {
+      allow read: if true;
+      // In-room guest requests created via mobile QR web app
+      allow create: if true;
+      // Staff update ticket progression; guests submit CSAT ratings
+      allow update: if true;
+      allow delete: if canManageRooms(resource.data.hotelId) || !isAuthenticated();
+    }
+
+    // Menu Items Collection: Room Service items
+    match /menu_items/{itemId} {
+      allow read: if true;
+      allow write: if isHotelStaff(request.resource.data.hotelId) || !isAuthenticated();
+    }
+  }
+}
+

@@ -1,0 +1,117 @@
+{
+  "entities": {
+    "Hotel": {
+      "title": "Hotel",
+      "description": "Hotel tenant in the multi-tenant SaaS platform",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "city": { "type": "string" },
+        "country": { "type": "string" },
+        "totalRooms": { "type": "number" },
+        "wifiSsid": { "type": "string" },
+        "wifiPass": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "code", "city", "country"]
+    },
+    "Room": {
+      "title": "Room",
+      "description": "Hotel room with digital door sign state",
+      "type": "object",
+      "properties": {
+        "hotelId": { "type": "string" },
+        "number": { "type": "string" },
+        "floor": { "type": "number" },
+        "building": { "type": "string" },
+        "type": { "type": "string" },
+        "guestName": { "type": "string" },
+        "doorSign": { "type": "string" },
+        "doorSignNote": { "type": "string" },
+        "preferredCleaningTime": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["hotelId", "number", "floor", "building"]
+    },
+    "Request": {
+      "title": "Request",
+      "description": "Guest service request, room service order or maintenance ticket",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "hotelId": { "type": "string" },
+        "roomNumber": { "type": "string" },
+        "guestName": { "type": "string" },
+        "category": { "type": "string" },
+        "subCategory": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "department": { "type": "string" },
+        "priority": { "type": "string" },
+        "status": { "type": "string" },
+        "assignedTo": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "totalAmount": { "type": "number" },
+        "rating": { "type": "number" },
+        "feedback": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["code", "hotelId", "roomNumber", "title", "department", "status"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Hotel staff, manager, administrator or guest profile",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "hotelId": { "type": "string" },
+        "department": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["email", "name", "role"]
+    },
+    "MenuItem": {
+      "title": "MenuItem",
+      "description": "Room service culinary dish or beverage",
+      "type": "object",
+      "properties": {
+        "hotelId": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "image": { "type": "string" },
+        "available": { "type": "boolean" },
+        "preparationTimeMinutes": { "type": "number" }
+      },
+      "required": ["hotelId", "name", "category", "price"]
+    }
+  },
+  "firestore": {
+    "collections": {
+      "hotels": {
+        "entity": "Hotel",
+        "description": "Hotels in the multi-tenant SaaS"
+      },
+      "rooms": {
+        "entity": "Room",
+        "description": "Rooms belonging to hotels"
+      },
+      "requests": {
+        "entity": "Request",
+        "description": "Guest service requests and work orders"
+      },
+      "users": {
+        "entity": "User",
+        "description": "User profiles and RBAC role definitions"
+      },
+      "menu_items": {
+        "entity": "MenuItem",
+        "description": "Room service menu catalog"
+      }
+    }
+  }
+}
