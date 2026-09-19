@@ -258,7 +258,7 @@ export const TopNavBar: React.FC = () => {
                       <div className="px-3 pt-2 pb-1">
                         <p className="text-[9px] font-black uppercase text-teal-700 tracking-wider flex items-center gap-1">
                           <span>👑</span>
-                          <span>Gerencia & Admins (QR + Habitaciones)</span>
+                          <span>Gerencia &amp; Admins (Reset + QR + Rooms)</span>
                         </p>
                       </div>
                       {(['GERENCIA', 'HOTEL_ADMIN', 'SUPER_ADMIN'] as UserRole[]).map((role) => (
@@ -274,7 +274,7 @@ export const TopNavBar: React.FC = () => {
                         >
                           <div>
                             <span className="font-semibold">{ROLE_LABELS[role]?.label}</span>
-                            <p className="text-[9px] text-slate-400">Acceso total, QR y rooms</p>
+                            <p className="text-[9px] text-slate-400">Acceso total, reset de datos, QR y rooms</p>
                           </div>
                           <span
                             className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${ROLE_LABELS[role]?.badge}`}

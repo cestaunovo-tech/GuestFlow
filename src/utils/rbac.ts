@@ -14,6 +14,10 @@ export const canManageRoomsAndQr = (role: UserRole): boolean => {
   return PRIVILEGED_ROLES.includes(role);
 };
 
+export const canResetAllData = (role: UserRole): boolean => {
+  return PRIVILEGED_ROLES.includes(role);
+};
+
 /**
  * Department associated with each operational role.
  * For management roles (GERENCIA, HOTEL_ADMIN, SUPER_ADMIN), they can access 'ALL'.

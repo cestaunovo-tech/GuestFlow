@@ -28,12 +28,15 @@ import {
   INITIAL_AI_INSIGHTS
 } from '../data/initialData';
 import { translations, Translations } from '../i18n/translations';
-import { canManageRoomsAndQr, getRoleDepartment } from '../utils/rbac';
+import { canManageRoomsAndQr, canResetAllData, getRoleDepartment } from '../utils/rbac';
 import {
   seedInitialDataIfEmpty,
   subscribeToHotelRequests,
   subscribeToHotelRooms,
   saveRequestToFirestore,
+  deleteRequestFromFirestore,
+  clearAllHotelRequestsFromFirestore,
+  resetAllHotelRoomsInFirestore,
   updateRoomDoorSignInFirestore,
   saveRoomToFirestore,
   deleteRoomFromFirestore,
@@ -146,6 +149,11 @@ interface GuestFlowContextType {
   // Smart Auto-Triage Helper
   autoTriageRequest: (text: string) => { department: Department; category: string; priority: RequestPriority };
 
+  // Data Purge & System Reset (Restricted to GERENCIA, HOTEL_ADMIN, SUPER_ADMIN)
+  canResetAllData: boolean;
+  clearAllRequestsHistory: () => Promise<number>;
+  resetAllHotelData: () => Promise<{ deletedRequests: number }>;
+
   // Calculated Operational KPIs
   stats: {
     totalRequests: number;
@@ -197,6 +205,7 @@ export const GuestFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [currentUser, setCurrentUser] = useState<HotelStaffUser | null>(INITIAL_STAFF_USERS[0]);
 
   const canManageRoomsAndQrVal = useMemo(() => canManageRoomsAndQr(currentRole), [currentRole]);
+  const canResetAllDataVal = useMemo(() => canResetAllData(currentRole), [currentRole]);
   const userDepartment = useMemo(() => getRoleDepartment(currentRole), [currentRole]);
 
   const setCurrentRole = (role: UserRole) => {
@@ -596,6 +605,56 @@ export const GuestFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const deleteRequest = (requestId: string) => {
     setRequests((prev) => prev.filter((r) => r.id !== requestId));
+    deleteRequestFromFirestore(requestId);
+  };
+
+  // Clear all requests & chat history (Restricted to GERENCIA, HOTEL_ADMIN, SUPER_ADMIN)
+  const clearAllRequestsHistory = async (): Promise<number> => {
+    if (!canResetAllData(currentRole)) {
+      throw new Error('Acceso no autorizado: Solo el Gerente General, Administrador de Hotel y Super Administrador pueden borrar el historial.');
+    }
+
+    const count = await clearAllHotelRequestsFromFirestore(currentHotel.id);
+    setRequests([]);
+    localStorage.removeItem(`${LS_PREFIX}requests`);
+    setNotifications((prev) => prev.filter((n) => !n.roomNumber));
+    return count;
+  };
+
+  // Complete reset of hotel data (Restricted to GERENCIA, HOTEL_ADMIN, SUPER_ADMIN)
+  const resetAllHotelData = async (): Promise<{ deletedRequests: number }> => {
+    if (!canResetAllData(currentRole)) {
+      throw new Error('Acceso no autorizado: Solo el Gerente General, Administrador de Hotel y Super Administrador pueden resetear los datos del hotel.');
+    }
+
+    // 1. Purge requests in Firestore & local state
+    const deletedRequests = await clearAllHotelRequestsFromFirestore(currentHotel.id);
+    setRequests([]);
+    localStorage.removeItem(`${LS_PREFIX}requests`);
+
+    // 2. Reset room door signs in Firestore
+    await resetAllHotelRoomsInFirestore(currentHotel.id);
+
+    // 3. Reset room door signs in local state
+    setRooms((prev) =>
+      prev.map((r) =>
+        r.hotelId === currentHotel.id
+          ? {
+              ...r,
+              doorSign: 'NORMAL',
+              doorSignNote: undefined,
+              preferredCleaningTime: undefined,
+            }
+          : r
+      )
+    );
+
+    // 4. Clear transient state
+    setCart([]);
+    setNotifications([]);
+    setAiInsights(INITIAL_AI_INSIGHTS);
+
+    return { deletedRequests };
   };
 
   // Get active concierge/reception chat request for a room
@@ -1096,6 +1155,7 @@ export const GuestFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setCurrentUser,
         staffUsers,
         canManageRoomsAndQr: canManageRoomsAndQrVal,
+        canResetAllData: canResetAllDataVal,
         userDepartment,
         activeView,
         setActiveView,
@@ -1111,6 +1171,8 @@ export const GuestFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         updateRequestStatus,
         rateRequest,
         deleteRequest,
+        clearAllRequestsHistory,
+        resetAllHotelData,
         sendChatMessage,
         markChatAsRead,
         getRoomChatRequest,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useGuestFlow } from '../../context/GuestFlowContext';
 import { CreateRoomModal } from './CreateRoomModal';
+import { ResetDataModal } from './ResetDataModal';
 import { generateQrCodeDataUrl, generateRoomUrl } from '../../utils/qrUtils';
 import { getDepartmentLabel, getRoleLabel } from '../../utils/rbac';
 import { Room } from '../../types';
@@ -23,7 +24,11 @@ import {
   Copy,
   X,
   Sparkles,
-  Lock
+  Lock,
+  RotateCcw,
+  ShieldAlert,
+  Database,
+  AlertTriangle
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -31,12 +36,14 @@ export const AdminConfigView: React.FC = () => {
   const {
     currentHotel,
     rooms,
+    requests,
     menuItems,
     deleteRoom,
     switchRoom,
     setActiveView,
     clearExampleRooms,
     canManageRoomsAndQr,
+    canResetAllData,
     currentRole,
     userDepartment
   } = useGuestFlow();
@@ -44,8 +51,12 @@ export const AdminConfigView: React.FC = () => {
   const [hotelName, setHotelName] = useState(currentHotel.name);
   const [wifiSsid, setWifiSsid] = useState(currentHotel.wifiSsid);
   const [wifiPass, setWifiPass] = useState(currentHotel.wifiPass);
-  const [activeTab, setActiveTab] = useState<'hotel' | 'rooms' | 'menu' | 'integrations'>('rooms');
+  const [activeTab, setActiveTab] = useState<'hotel' | 'rooms' | 'menu' | 'integrations' | 'data'>('rooms');
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // Reset modal state
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetModalMode, setResetModalMode] = useState<'history_only' | 'full_reset'>('history_only');
 
   // Room modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -189,6 +200,7 @@ export const AdminConfigView: React.FC = () => {
             { id: 'rooms' as const, label: 'Habitaciones' },
             { id: 'menu' as const, label: 'Room Service Menú' },
             { id: 'integrations' as const, label: 'Integraciones PMS/POS' },
+            { id: 'data' as const, label: 'Datos & Reset' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -495,6 +507,159 @@ export const AdminConfigView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* TAB: DATA & SYSTEM RESET (RBAC PROTECTED) */}
+      {activeTab === 'data' && (
+        <div className="space-y-6 animate-in fade-in">
+          {/* RBAC Security Header */}
+          <div className="bg-slate-900 text-white rounded-3xl p-6 border border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black">Zona de Gestión de Datos &amp; Reset del Sistema</h3>
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                    Directiva Exclusiva
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Operaciones de purga de historial y restablecimiento de estados para {currentHotel.name}.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 border border-white/10 text-xs">
+              <ShieldCheck className={`w-4 h-4 ${canResetAllData ? 'text-emerald-400' : 'text-amber-400'}`} />
+              <span className="text-slate-300">
+                Acceso: <strong className="text-white">{getRoleLabel(currentRole)}</strong>
+              </span>
+            </div>
+          </div>
+
+          {!canResetAllData ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 text-amber-900 space-y-3">
+              <div className="flex items-center gap-2 font-bold text-sm text-amber-800">
+                <Lock className="w-5 h-5 text-amber-600" />
+                <span>Permisos Insuficientes para Borrado de Datos</span>
+              </div>
+              <p className="text-xs text-amber-700 leading-relaxed">
+                Por directiva de seguridad, la eliminación de historial y el reseteo de datos hoteleros está estrictamente reservada para los roles de <strong>Gerente General</strong>, <strong>Administrador de Hotel</strong> y <strong>Super Administrador</strong>.
+              </p>
+              <p className="text-xs text-amber-700">
+                Tu rol actual es <strong>{getRoleLabel(currentRole)}</strong> ({userDepartment !== 'ALL' ? `Departamento: ${getDepartmentLabel(userDepartment)}` : 'Sin departamento asignado'}). Si requieres efectuar un reseteo, solicita acceso al Gerente o cambia tu rol directivo en la barra superior.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Card 1: Clear History */}
+              <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs flex flex-col justify-between hover:border-slate-300 transition space-y-5">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100">
+                      <Trash2 className="w-6 h-6" />
+                    </div>
+                    <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+                      {requests.filter((r) => r.hotelId === currentHotel.id).length} registros
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="text-base font-black text-slate-900">Borrar Historial de Operaciones</h4>
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                      Elimina de forma irreversible todas las solicitudes de huéspedes, órdenes de Room Service, tickets a departamentos y transcripciones de chat de {currentHotel.name} en Firestore.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 text-[11px] text-slate-600 space-y-1.5">
+                    <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
+                      <span>Lo que se conserva:</span>
+                    </div>
+                    <p className="text-slate-500 pl-5">
+                      Tus {hotelRooms.length} habitaciones, nombres de huéspedes, códigos QR generados y configuraciones de Wi-Fi permanecerán intactos.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetModalMode('history_only');
+                    setShowResetModal(true);
+                  }}
+                  className="w-full py-3 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm shadow-rose-600/20 transition cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Borrar Todo el Historial</span>
+                </button>
+              </div>
+
+              {/* Card 2: Full Hotel Reset */}
+              <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs flex flex-col justify-between hover:border-slate-300 transition space-y-5">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-100">
+                      <RotateCcw className="w-6 h-6" />
+                    </div>
+                    <span className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                      Reset Integral
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="text-base font-black text-slate-900">Restablecer Todo el Establecimiento</h4>
+                    <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                      Borra el historial completo y restablece todos los estados operativos de las {hotelRooms.length} habitaciones a "Sin cartel" (limpiando notas y horarios preferidos de limpieza).
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 bg-amber-50/50 rounded-2xl border border-amber-100 text-[11px] text-amber-900 space-y-1.5">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-800">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Estado inicial limpio:</span>
+                    </div>
+                    <p className="text-amber-700 pl-5">
+                      Ideal para inicio de nueva temporada o pruebas completas de integración QR con huéspedes reales.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetModalMode('full_reset');
+                    setShowResetModal(true);
+                  }}
+                  className="w-full py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
+                >
+                  <RotateCcw className="w-4 h-4 text-amber-400" />
+                  <span>Reset Total del Hotel</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Database Security info */}
+          <div className="bg-slate-50 border border-slate-200 rounded-3xl p-5 flex items-center justify-between text-xs text-slate-600">
+            <div className="flex items-center gap-2">
+              <Database className="w-4 h-4 text-slate-500" />
+              <span>Base de datos en la nube: <strong>Google Cloud Firestore</strong> (multi-tenant con aislamiento por hotelId)</span>
+            </div>
+            <span className="text-[11px] text-teal-700 bg-teal-50 border border-teal-200 font-bold px-2 py-0.5 rounded-lg">
+              Sincronización Bidireccional
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Reset Data */}
+      <ResetDataModal
+        isOpen={showResetModal}
+        onClose={() => setShowResetModal(false)}
+        defaultMode={resetModalMode}
+      />
 
       {/* Modal to Create Room */}
       <CreateRoomModal

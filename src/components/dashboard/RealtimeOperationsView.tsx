@@ -18,9 +18,13 @@ import {
   Lock,
   ShieldCheck,
   Layers,
-  MessageSquare
+  MessageSquare,
+  Trash2,
+  RotateCcw,
+  ShieldAlert
 } from 'lucide-react';
 import { StaffChatModal } from './StaffChatModal';
+import { ResetDataModal } from './ResetDataModal';
 
 export const RealtimeOperationsView: React.FC = () => {
   const {
@@ -31,6 +35,7 @@ export const RealtimeOperationsView: React.FC = () => {
     currentRole,
     staffUsers,
     canManageRoomsAndQr,
+    canResetAllData,
     userDepartment
   } = useGuestFlow();
 
@@ -39,6 +44,7 @@ export const RealtimeOperationsView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [selectedChatRequest, setSelectedChatRequest] = useState<GuestRequest | null>(null);
+  const [showResetModal, setShowResetModal] = useState(false);
 
   // Filter requests for current hotel based on RBAC:
   // Non-privileged users (Recepción, Housekeeping, Room Service, Mantenimiento) can ONLY view requests of their department!
@@ -295,7 +301,7 @@ export const RealtimeOperationsView: React.FC = () => {
 
       {/* Requests Table / Card Stream */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="p-4 sm:p-5 bg-slate-900 text-white flex items-center justify-between">
+        <div className="p-4 sm:p-5 bg-slate-900 text-white flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-teal-400 animate-ping" />
             <h3 className="text-sm font-bold">Bandeja de Operaciones en Tiempo Real</h3>
@@ -303,9 +309,23 @@ export const RealtimeOperationsView: React.FC = () => {
               {filteredRequests.length} solicitudes
             </span>
           </div>
-          <span className="text-[11px] text-teal-300 hidden sm:inline">
-            Actualización en vivo sincronizada con habitaciones
-          </span>
+          <div className="flex items-center gap-2.5">
+            {canResetAllData && (
+              <button
+                type="button"
+                onClick={() => setShowResetModal(true)}
+                className="px-3 py-1.5 rounded-xl bg-rose-600/90 hover:bg-rose-600 text-white text-xs font-bold flex items-center gap-1.5 transition border border-rose-500/40 cursor-pointer shadow-xs"
+                title="Borrar historial o resetear datos del hotel (Solo Gerente, Admin y Super Admin)"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Borrar Historial / Reset</span>
+                <span className="sm:hidden">Reset</span>
+              </button>
+            )}
+            <span className="text-[11px] text-teal-300 hidden md:inline">
+              Actualización en vivo sincronizada con habitaciones
+            </span>
+          </div>
         </div>
 
         <div className="divide-y divide-slate-100">
@@ -517,6 +537,12 @@ export const RealtimeOperationsView: React.FC = () => {
           request={selectedChatRequest}
         />
       )}
+
+      {/* Reset Data & Purge History Modal (RBAC Protected) */}
+      <ResetDataModal
+        isOpen={showResetModal}
+        onClose={() => setShowResetModal(false)}
+      />
     </div>
   );
 };

@@ -6,6 +6,7 @@ import {
   getDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
   onSnapshot,
   query,
   where,
@@ -230,3 +231,75 @@ export async function saveUserProfileToFirestore(user: HotelStaffUser): Promise<
     console.warn('Firestore saveUserProfile fallback:', err);
   }
 }
+
+/**
+ * Delete a single Request from Firestore
+ */
+export async function deleteRequestFromFirestore(requestId: string): Promise<void> {
+  try {
+    const ref = doc(db, REQUESTS_COL, requestId);
+    await deleteDoc(ref);
+  } catch (err) {
+    console.warn('Firestore deleteRequest fallback:', err);
+  }
+}
+
+/**
+ * Clear all Requests and chat threads for a hotel from Firestore
+ */
+export async function clearAllHotelRequestsFromFirestore(hotelId: string): Promise<number> {
+  try {
+    const q = query(collection(db, REQUESTS_COL), where('hotelId', '==', hotelId));
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return 0;
+
+    let count = 0;
+    const batch = writeBatch(db);
+    snapshot.forEach((docSnap) => {
+      batch.delete(doc(db, REQUESTS_COL, docSnap.id));
+      count++;
+    });
+    await batch.commit();
+    console.log(`🧹 Cleared ${count} requests from Firestore for hotel ${hotelId}`);
+    return count;
+  } catch (err) {
+    console.warn('Firestore clearAllHotelRequests fallback:', err);
+    return 0;
+  }
+}
+
+/**
+ * Reset all rooms' door sign status and guest notes for a hotel in Firestore
+ */
+export async function resetAllHotelRoomsInFirestore(hotelId: string): Promise<void> {
+  try {
+    const q = query(collection(db, ROOMS_COL), where('hotelId', '==', hotelId));
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return;
+
+    const batch = writeBatch(db);
+    snapshot.forEach((docSnap) => {
+      const roomRef = doc(db, ROOMS_COL, docSnap.id);
+      batch.update(roomRef, {
+        doorSign: 'NORMAL',
+        doorSignNote: '',
+        preferredCleaningTime: '',
+        updatedAt: new Date().toISOString()
+      });
+    });
+    await batch.commit();
+    console.log(`🔄 Reset door signs for hotel rooms in Firestore (${hotelId})`);
+  } catch (err) {
+    console.warn('Firestore resetAllHotelRooms fallback:', err);
+  }
+}
+
+/**
+ * Complete reset of hotel data (purges all requests and resets all rooms to clean baseline)
+ */
+export async function resetHotelDataInFirestore(hotelId: string): Promise<{ deletedRequests: number }> {
+  const deletedRequests = await clearAllHotelRequestsFromFirestore(hotelId);
+  await resetAllHotelRoomsInFirestore(hotelId);
+  return { deletedRequests };
+}
+
