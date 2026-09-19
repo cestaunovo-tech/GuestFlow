@@ -31,8 +31,12 @@ export const GuestHome: React.FC = () => {
     currentRoom,
     createRequest,
     autoTriageRequest,
-    setActiveView
+    setActiveView,
+    getRoomChatRequest,
   } = useGuestFlow();
+
+  const roomChat = getRoomChatRequest(currentRoom?.number);
+  const hasUnreadFromStaff = !!roomChat?.hasUnreadStaffMessages;
 
   // Modals state
   const [activeModal, setActiveModal] = useState<
@@ -160,10 +164,14 @@ export const GuestHome: React.FC = () => {
       id: 'reception',
       title: t.contactReception,
       icon: '🛎️',
-      desc: 'Mensaje directo, llamada o asistencia',
+      desc: hasUnreadFromStaff
+        ? '¡Tienes una respuesta nueva de conserjería!'
+        : 'Chat directo, llamada o asistencia',
       action: () => setActiveModal('reception'),
-      color: 'hover:border-emerald-500 hover:bg-emerald-50/40',
-      tag: 'Online 24/7',
+      color: hasUnreadFromStaff
+        ? 'border-rose-400 bg-rose-50/70 ring-2 ring-rose-400 shadow-md'
+        : 'hover:border-emerald-500 hover:bg-emerald-50/40',
+      tag: hasUnreadFromStaff ? 'Nuevo Mensaje' : 'Online 24/7',
     },
     {
       id: 'reportProblem',
@@ -641,6 +649,24 @@ export const GuestHome: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Floating Concierge Chat Bubble */}
+      <button
+        type="button"
+        onClick={() => setActiveModal('reception')}
+        className={`fixed bottom-5 right-5 z-40 px-4 py-3 rounded-full shadow-2xl flex items-center gap-2.5 font-bold text-xs sm:text-sm transition-all duration-300 cursor-pointer ${
+          hasUnreadFromStaff
+            ? 'bg-rose-600 hover:bg-rose-700 text-white animate-bounce ring-4 ring-rose-400/30'
+            : 'bg-slate-900 hover:bg-teal-700 text-white border border-teal-500/30 hover:scale-105'
+        }`}
+        aria-label="Abrir chat con recepción y conserjes"
+      >
+        <span className="text-base">🛎️</span>
+        <span>Chat Conserjes</span>
+        {hasUnreadFromStaff && (
+          <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping" />
+        )}
+      </button>
     </div>
   );
 };

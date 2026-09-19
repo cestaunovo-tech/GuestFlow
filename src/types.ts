@@ -78,6 +78,14 @@ export interface OrderItem {
   notes?: string;
 }
 
+export interface RequestChatMessage {
+  id: string;
+  sender: 'guest' | 'staff' | 'ai_concierge';
+  senderName: string;
+  text: string;
+  timestamp: string;
+}
+
 export interface GuestRequest {
   id: string;
   code: string; // e.g. "GF-10452"
@@ -105,6 +113,9 @@ export interface GuestRequest {
   feedback?: string;
   autoRouted: boolean;
   routeReason?: string;
+  messages?: RequestChatMessage[];
+  hasUnreadStaffMessages?: boolean;
+  hasUnreadGuestMessages?: boolean;
 }
 
 export interface MenuItem {

@@ -17,8 +17,10 @@ import {
   RefreshCw,
   Lock,
   ShieldCheck,
-  Layers
+  Layers,
+  MessageSquare
 } from 'lucide-react';
+import { StaffChatModal } from './StaffChatModal';
 
 export const RealtimeOperationsView: React.FC = () => {
   const {
@@ -36,6 +38,7 @@ export const RealtimeOperationsView: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [selectedChatRequest, setSelectedChatRequest] = useState<GuestRequest | null>(null);
 
   // Filter requests for current hotel based on RBAC:
   // Non-privileged users (Recepción, Housekeeping, Room Service, Mantenimiento) can ONLY view requests of their department!
@@ -418,6 +421,21 @@ export const RealtimeOperationsView: React.FC = () => {
 
                     {/* Operational Action Buttons */}
                     <div className="flex items-center gap-1.5">
+                      {/* Chat with Guest Button */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedChatRequest(req)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer ${
+                          req.hasUnreadGuestMessages
+                            ? 'bg-rose-600 hover:bg-rose-700 text-white animate-pulse'
+                            : 'bg-teal-50 text-teal-800 hover:bg-teal-100 border border-teal-200'
+                        }`}
+                        title="Abrir chat en vivo con el huésped"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Chat {req.messages?.length ? `(${req.messages.length})` : ''}</span>
+                      </button>
+
                       {req.status === 'RECIBIDA' && (
                         <button
                           onClick={() =>
@@ -489,6 +507,15 @@ export const RealtimeOperationsView: React.FC = () => {
             <img src={selectedPhoto} alt="Evidencia" className="w-full rounded-2xl max-h-[70vh] object-cover" />
           </div>
         </div>
+      )}
+
+      {/* Staff 2-way Chat Modal */}
+      {selectedChatRequest && (
+        <StaffChatModal
+          isOpen={!!selectedChatRequest}
+          onClose={() => setSelectedChatRequest(null)}
+          request={selectedChatRequest}
+        />
       )}
     </div>
   );

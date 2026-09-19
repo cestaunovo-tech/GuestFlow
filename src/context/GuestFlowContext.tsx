@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Hotel,
   Room,
   GuestRequest,
+  RequestChatMessage,
   MenuItem,
   DirectoryItem,
   DestinationItem,
@@ -105,6 +106,17 @@ interface GuestFlowContextType {
   updateRequestStatus: (requestId: string, newStatus: RequestStatus, assignedTo?: string) => void;
   rateRequest: (requestId: string, rating: number, feedback?: string) => void;
   deleteRequest: (requestId: string) => void;
+
+  // Concierge & Front Desk Real-Time Chat
+  sendChatMessage: (params: {
+    text: string;
+    sender: 'guest' | 'staff';
+    senderName?: string;
+    roomNumber?: string;
+    requestId?: string;
+  }) => GuestRequest;
+  markChatAsRead: (requestId: string, forWhom: 'guest' | 'staff') => void;
+  getRoomChatRequest: (roomNumber?: string) => GuestRequest | undefined;
 
   // Room Service Menu & Cart
   menuItems: MenuItem[];
@@ -586,6 +598,188 @@ export const GuestFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setRequests((prev) => prev.filter((r) => r.id !== requestId));
   };
 
+  // Get active concierge/reception chat request for a room
+  const getRoomChatRequest = useCallback((roomNumber?: string): GuestRequest | undefined => {
+    const rNum = roomNumber || currentRoom?.number;
+    if (!rNum) return undefined;
+    return requests.find(
+      (r) =>
+        r.hotelId === currentHotel.id &&
+        r.roomNumber === rNum &&
+        r.department === 'RECEPCION' &&
+        (r.category === 'Conserjería & Recepción' || r.category === 'Contactar recepción' || !!r.messages) &&
+        r.status !== 'CANCELADA'
+    );
+  }, [requests, currentHotel.id, currentRoom?.number]);
+
+  // Real-Time Concierge & Front Desk 2-Way Chat
+  const sendChatMessage = (params: {
+    text: string;
+    sender: 'guest' | 'staff';
+    senderName?: string;
+    roomNumber?: string;
+    requestId?: string;
+  }): GuestRequest => {
+    const rNumber = params.roomNumber || (currentRoom ? currentRoom.number : 'Sin Asignar');
+    const guestObj = rooms.find((r) => r.hotelId === currentHotel.id && r.number === rNumber);
+    const guestName = guestObj?.guestName || (currentRoom?.guestName || 'Huésped');
+    const floor = guestObj?.floor || currentRoom?.floor || 1;
+    const building = guestObj?.building || currentRoom?.building || 'Principal';
+
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const newMsg: RequestChatMessage = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      sender: params.sender,
+      senderName:
+        params.senderName ||
+        (params.sender === 'guest'
+          ? guestName
+          : currentUser?.name || 'Conserje Front Desk'),
+      text: params.text,
+      timestamp: timeStr,
+    };
+
+    // Find existing active concierge / reception request for this room or specific requestId
+    let existingReq = params.requestId
+      ? requests.find((r) => r.id === params.requestId)
+      : requests.find(
+          (r) =>
+            r.hotelId === currentHotel.id &&
+            r.roomNumber === rNumber &&
+            r.department === 'RECEPCION' &&
+            r.status !== 'CANCELADA'
+        );
+
+    let updatedReq: GuestRequest;
+
+    if (existingReq) {
+      const updatedMessages = [...(existingReq.messages || []), newMsg];
+      updatedReq = {
+        ...existingReq,
+        description: params.text,
+        messages: updatedMessages,
+        hasUnreadStaffMessages: params.sender === 'staff' ? true : false,
+        hasUnreadGuestMessages: params.sender === 'guest' ? true : false,
+        status: existingReq.status === 'COMPLETADA' ? 'EN_PROCESO' : existingReq.status,
+      };
+
+      setRequests((prev) => prev.map((r) => (r.id === updatedReq.id ? updatedReq : r)));
+      saveRequestToFirestore(updatedReq);
+    } else {
+      const nextCode = `GF-${Math.floor(10400 + requests.length + 10)}`;
+      updatedReq = {
+        id: `req-${Date.now()}`,
+        code: nextCode,
+        hotelId: currentHotel.id,
+        roomNumber: rNumber,
+        floor,
+        building,
+        guestName,
+        department: 'RECEPCION',
+        category: 'Conserjería & Recepción',
+        subCategory: 'Chat en Vivo',
+        title: `Chat con Hab. ${rNumber} (${guestName})`,
+        description: params.text,
+        status: 'RECIBIDA',
+        priority: 'MEDIA',
+        createdAt: now.toISOString(),
+        autoRouted: true,
+        routeReason: 'Canal de mensajería directa con Conserjes y Recepción',
+        messages: [newMsg],
+        hasUnreadStaffMessages: params.sender === 'staff',
+        hasUnreadGuestMessages: params.sender === 'guest',
+      };
+
+      setRequests((prev) => [updatedReq, ...prev]);
+      saveRequestToFirestore(updatedReq);
+    }
+
+    // If sent by guest, notify staff & optionally trigger smart concierge assistant
+    if (params.sender === 'guest') {
+      const notif: NotificationToast = {
+        id: `notif-${Date.now()}`,
+        title: `Nuevo mensaje de Hab. ${rNumber}`,
+        message: `${guestName}: "${params.text.slice(0, 60)}"`,
+        department: 'RECEPCION',
+        roomNumber: rNumber,
+        timestamp: 'Ahora mismo',
+        read: false,
+      };
+      setNotifications((prev) => [notif, ...prev]);
+
+      // Smart Assistant response when helpful with actual hotel details
+      const lower = params.text.toLowerCase();
+      let autoReplyText = '';
+      if (lower.includes('wifi') || lower.includes('wi-fi') || lower.includes('clave') || lower.includes('contraseña')) {
+        autoReplyText = `📶 La red Wi-Fi es "${currentHotel.wifiSsid}" y la contraseña es "${currentHotel.wifiPass}". Nuestro equipo de recepción está atento si requieres soporte técnico.`;
+      } else if (lower.includes('check-out') || lower.includes('checkout') || lower.includes('salida') || lower.includes('hora de salida')) {
+        autoReplyText = `🕒 La hora oficial de check-out es a las ${currentHotel.checkOutTime || '12:00 PM'}. Si requieres Late Check-Out, el equipo de conserjería te responderá a la brevedad con la disponibilidad.`;
+      } else if (lower.includes('taxi') || lower.includes('transporte') || lower.includes('traslado') || lower.includes('aeropuerto')) {
+        autoReplyText = `🚖 Con gusto coordinamos tu taxi o servicio de traslado privado desde la recepción. Por favor indícanos destino y hora deseada.`;
+      } else if (lower.includes('toalla') || lower.includes('toallas')) {
+        autoReplyText = `🧺 Solicitud de toallas adicionales tomada. Hemos notificado al departamento de Housekeeping para enviarlas de inmediato.`;
+      } else if (lower.includes('desayuno') || lower.includes('buffet')) {
+        autoReplyText = `☕ El desayuno buffet se sirve en el Restaurante Principal de 07:00 a 11:00 AM. También puedes ordenar Room Service directamente desde la app.`;
+      }
+
+      if (autoReplyText) {
+        setTimeout(() => {
+          const aiMsg: RequestChatMessage = {
+            id: `msg-${Date.now()}-ai`,
+            sender: 'ai_concierge',
+            senderName: 'Asistente Concierge 24/7',
+            text: autoReplyText,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+
+          setRequests((prev) =>
+            prev.map((r) => {
+              if (r.id === updatedReq.id) {
+                const withAi = {
+                  ...r,
+                  messages: [...(r.messages || []), aiMsg],
+                  hasUnreadStaffMessages: true,
+                };
+                saveRequestToFirestore(withAi);
+                return withAi;
+              }
+              return r;
+            })
+          );
+        }, 900);
+      }
+    }
+
+    return updatedReq;
+  };
+
+  // Mark chat as read
+  const markChatAsRead = useCallback((requestId: string, forWhom: 'guest' | 'staff') => {
+    setRequests((prev) => {
+      const target = prev.find((r) => r.id === requestId);
+      if (!target) return prev;
+      const isUnread = forWhom === 'guest' ? !!target.hasUnreadStaffMessages : !!target.hasUnreadGuestMessages;
+      if (!isUnread) {
+        return prev;
+      }
+      return prev.map((r) => {
+        if (r.id === requestId) {
+          const updated = {
+            ...r,
+            ...(forWhom === 'guest'
+              ? { hasUnreadStaffMessages: false }
+              : { hasUnreadGuestMessages: false }),
+          };
+          saveRequestToFirestore(updated);
+          return updated;
+        }
+        return r;
+      });
+    });
+  }, []);
+
   // Update digital door sign
   const updateDoorSign = (status: DoorSignStatus, note?: string, preferredTime?: string) => {
     if (!currentRoom) return;
@@ -917,6 +1111,9 @@ export const GuestFlowProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         updateRequestStatus,
         rateRequest,
         deleteRequest,
+        sendChatMessage,
+        markChatAsRead,
+        getRoomChatRequest,
         menuItems,
         cart,
         addToCart,

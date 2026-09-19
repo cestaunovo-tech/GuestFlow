@@ -16,8 +16,10 @@ import {
   User,
   Filter,
   Lock,
-  ShieldCheck
+  ShieldCheck,
+  MessageSquare
 } from 'lucide-react';
+import { StaffChatModal } from './StaffChatModal';
 
 interface DepartmentViewsProps {
   initialDept?: Department;
@@ -43,6 +45,7 @@ export const DepartmentViews: React.FC<DepartmentViewsProps> = ({ initialDept })
 
   const [activeDept, setActiveDept] = useState<Department>(defaultDept);
   const [selectedFloor, setSelectedFloor] = useState<string>('ALL');
+  const [selectedChatRequest, setSelectedChatRequest] = useState<GuestRequest | null>(null);
 
   useEffect(() => {
     if (!canManageRoomsAndQr && userDepartment !== 'ALL') {
@@ -425,37 +428,139 @@ export const DepartmentViews: React.FC<DepartmentViewsProps> = ({ initialDept })
         </div>
       )}
 
-      {/* VIEW: RECEPCION WORKSPACE */}
+      {/* VIEW: RECEPCION & CONCIERGE WORKSPACE */}
       {activeDept === 'RECEPCION' && (
-        <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-4">
-          <h3 className="text-base font-bold text-slate-900">🛎️ Consola de Front Desk & Concierge</h3>
-          <div className="divide-y divide-slate-100">
-            {deptRequests.map((req) => (
-              <div key={req.id} className="py-4 flex items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-900">Hab {req.roomNumber} ({req.guestName})</span>
-                    <span className="text-xs text-slate-400">· {req.category}</span>
-                  </div>
-                  <p className="text-xs text-slate-600 mt-1">{req.description}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold px-2 py-1 rounded bg-slate-100 text-slate-700">
-                    {req.status}
-                  </span>
-                  {req.status !== 'COMPLETADA' && (
-                    <button
-                      onClick={() => updateRequestStatus(req.id, 'COMPLETADA')}
-                      className="px-3 py-1.5 rounded-xl bg-teal-600 text-white font-bold text-xs"
-                    >
-                      Atendido
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-100">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <span>🛎️</span>
+                <span>Consola de Conserjería & Chat en Vivo</span>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 font-bold border border-teal-200">
+                  24/7 Activo
+                </span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Canal bidireccional en tiempo real con los huéspedes de todas las habitaciones.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500">
+                {deptRequests.filter((r) => r.hasUnreadGuestMessages).length} sin leer
+              </span>
+            </div>
           </div>
+
+          {deptRequests.length === 0 ? (
+            <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+              <MessageSquare className="w-10 h-10 mx-auto text-slate-400 mb-2 opacity-50" />
+              <h4 className="text-sm font-bold text-slate-700">No hay consultas de recepción activas</h4>
+              <p className="text-xs text-slate-400 mt-1">
+                Los mensajes de chat y solicitudes de llamada de los huéspedes aparecerán aquí automáticamente en tiempo real.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3">
+              {deptRequests.map((req) => {
+                const hasUnread = !!req.hasUnreadGuestMessages;
+                const msgCount = req.messages?.length || 0;
+                const lastMessage = req.messages && req.messages.length > 0
+                  ? req.messages[req.messages.length - 1]
+                  : null;
+
+                return (
+                  <div
+                    key={req.id}
+                    className={`p-4 rounded-2xl border transition ${
+                      hasUnread
+                        ? 'border-teal-300 bg-teal-50/40 shadow-xs ring-2 ring-teal-500/20'
+                        : 'border-slate-200 bg-white hover:border-slate-300 shadow-2xs'
+                    }`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={`w-11 h-11 rounded-xl flex items-center justify-center text-lg shrink-0 font-black ${
+                            hasUnread
+                              ? 'bg-teal-600 text-white shadow-xs'
+                              : 'bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          {req.roomNumber}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-black text-slate-900 text-sm">
+                              Habitación {req.roomNumber}
+                            </span>
+                            <span className="text-xs text-slate-500">· {req.guestName}</span>
+                            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                              {req.code}
+                            </span>
+                            {hasUnread && (
+                              <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-bold animate-pulse">
+                                Nuevo mensaje
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="text-xs font-semibold text-slate-800 mt-1">
+                            {req.title}
+                          </p>
+
+                          {lastMessage && (
+                            <p className="text-xs text-slate-500 mt-1 bg-white/80 p-2 rounded-lg border border-slate-200/80 inline-block max-w-xl">
+                              <span className="font-bold text-slate-700">
+                                {lastMessage.sender === 'guest' ? req.guestName : lastMessage.senderName}:
+                              </span>{' '}
+                              "{lastMessage.text}"{' '}
+                              <span className="text-[10px] text-slate-400">({lastMessage.timestamp})</span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedChatRequest(req)}
+                          className="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          <span>Chat ({msgCount})</span>
+                        </button>
+
+                        <span className="text-xs font-bold px-2.5 py-1.5 rounded-xl bg-slate-100 text-slate-700">
+                          {req.status}
+                        </span>
+
+                        {req.status !== 'COMPLETADA' && (
+                          <button
+                            type="button"
+                            onClick={() => updateRequestStatus(req.id, 'COMPLETADA')}
+                            className="px-3 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs transition cursor-pointer"
+                          >
+                            Atendido
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
+      )}
+
+      {/* Staff 2-way Chat Modal */}
+      {selectedChatRequest && (
+        <StaffChatModal
+          isOpen={!!selectedChatRequest}
+          onClose={() => setSelectedChatRequest(null)}
+          request={selectedChatRequest}
+        />
       )}
     </div>
   );
